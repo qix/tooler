@@ -2,6 +2,7 @@ import sys
 from functools import wraps
 
 from .active import set_active_tooler
+from .colors import yellow
 from .command import ToolerCommand
 from .util import (
   abort,
@@ -14,7 +15,7 @@ class Tooler(object):
     self.submodules = {}
 
     self.default_proceed_message = 'Are you sure you want to proceed?'
-    self.auto_proceed = False
+    self.assume_defaults = False
 
   def command(self, fn=None, docopt=False):
     # This function creates a decorator. If we were passed a function here then
@@ -63,10 +64,34 @@ class Tooler(object):
 
     script_name = args.pop(0)
 
-    if not args:
+    # Super simple parser for tooler options
+    toggles = {
+      '--assume-defaults': False,
+    }
+
+    idx = 0
+    command = None
+    while idx < len(args):
+      if args[idx] in toggles:
+        # If it's a toggle switch to true if it was used once
+        if toggles[args[idx]]:
+          return self.usage()
+        else:
+          toggles[args[idx]] = True
+        idx += 1
+      elif args[idx].startswith('-'):
+        return self.usage()
+      else:
+        command = args[idx]
+        args = args[idx + 1:]
+        break
+
+    self.assume_defaults = toggles['--assume-defaults']
+
+    if command in self.commands:
+      self.commands[command].run(args)
+    else:
       self.usage()
-    elif args[0] in self.commands:
-      self.commands[args[0]].run(args[1:])
 
 
   def usage(self, script_name='./script'):
@@ -101,9 +126,9 @@ class Tooler(object):
     }
     default_text = {False: 'n', True: 'y'}[default]
 
-    if self.auto_proceed:
-      print(yellow('Auto-proceed:', bold=True), message)
-      print(yellow('Taking default option:'), yellow(default_text, bold=True))
+    if self.assume_defaults:
+      print(message)
+      print(yellow('Assuming default option:'), yellow(default_text, bold=True))
       return default
 
     suggestion = ' [y/n]'

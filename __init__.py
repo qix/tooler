@@ -3,7 +3,8 @@ from .active import (
   get_active_tooler,
   set_active_tooler,
 )
-from .local import (
+from .env import env
+from .shell import (
   bash,
 )
 from .tooler import Tooler
