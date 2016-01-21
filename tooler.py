@@ -4,6 +4,8 @@ from functools import wraps
 from .active import set_active_tooler
 from .colors import yellow
 from .command import ToolerCommand
+from .env import ToolerEnv
+from .shell import bash
 from .util import (
   abort,
 )
@@ -12,12 +14,21 @@ class Tooler(object):
 
   def __init__(self):
     self.commands = {}
+    self.env = ToolerEnv()
     self.submodules = {}
 
     self.default_proceed_message = 'Are you sure you want to proceed?'
     self.assume_defaults = False
+    self.default = None
+    self.root = self
+    self.parent = None
 
-  def command(self, fn=None, docopt=False):
+  def _set_parent(self, parent):
+    self.parent = parent
+    self.env = parent.env
+    self.root = parent.root
+
+  def command(self, fn=None, name=None, alias=[], default=False, parser=None):
     # This function creates a decorator. If we were passed a function here then
     # we need to first create the decorator and then pass the function to it.
     if fn is not None:
@@ -28,41 +39,44 @@ class Tooler(object):
       def decorated(*args, **kv):
         return fn(*args, **kv)
 
-      self.add_command(fn.__name__, ToolerCommand(
+      self.add_command(fn.__name__ if name is None else name, ToolerCommand(
         fn.__name__,
         fn,
         doc=fn.__doc__,
-        docopt=docopt,
-      ))
+        parser=parser,
+      ), default=default)
 
       return decorated
 
     return decorator
 
-  def add_command(self, name, command):
+  def add_command(self, name, command, default=False):
     if name in self.commands:
       raise Exception('Second definition of command: %s' % name)
     if name in self.submodules:
       raise Exception('Command was defined as a submodule: %s' % name)
+    if default:
+      assert self.default is None, 'Only one default option is allowed.'
+      self.default = command
 
     self.commands[name] = command
 
   def add_submodule(self, name, tooler):
+    tooler._set_parent(self)
     if tooler.has_default():
-      self.add_command(name, tooler)
+      self.add_command(name, tooler.default)
     for subname, command in tooler.commands.items():
       self.add_command('%s.%s' % (name, subname), command)
 
   def has_default(self):
-    return False
+    return True if self.default else False
 
-  def run(self, args=None):
+  def run(self, args=None, script_name=None):
     set_active_tooler(self)
 
-    if not args:
+    if args is None:
       args = sys.argv
-
-    script_name = args.pop(0)
+      script_name = args.pop(0)
 
     # Super simple parser for tooler options
     toggles = {
@@ -75,23 +89,31 @@ class Tooler(object):
       if args[idx] in toggles:
         # If it's a toggle switch to true if it was used once
         if toggles[args[idx]]:
-          return self.usage()
+          print('Error argument', args[idx])
+          return
         else:
           toggles[args[idx]] = True
         idx += 1
       elif args[idx].startswith('-'):
-        return self.usage()
+        print('Error argument', args[idx])
+        return
       else:
         command = args[idx]
+        if ':' in command:
+          (command, selector) = command.split(':', 1)
+        else:
+          selector = None
         args = args[idx + 1:]
         break
 
     self.assume_defaults = toggles['--assume-defaults']
 
     if command in self.commands:
-      self.commands[command].run(args)
-    else:
+      self.commands[command].run(selector, args)
+    elif command is None:
       self.usage()
+    else:
+      print('Unknown command', command)
 
 
   def usage(self, script_name='./script'):
@@ -141,3 +163,9 @@ class Tooler(object):
   def proceed_or_abort(self, message=None, default=False):
     if not self.proceed(message, default=default):
       abort('User requested not to proceed.')
+
+  def bash(self, *args, **kv):
+    return bash(self.env, *args, **kv)
+
+  def settings(self, *args, **kv):
+    return self.env.settings(*args, **kv)

@@ -1,8 +1,49 @@
+from collections import namedtuple
 from contextlib import contextmanager
 
+from .shell import (
+  _local_bash,
+  _ssh_bash
+)
+
+SshHost = namedtuple('SshHost', (
+  'username',
+  'hostname',
+  'name',
+))
+
+class Host(object):
+  pass
+
+class SshHost(Host):
+  def __init__(self, name, hostname=None, username=None):
+    self.name = name
+    self.hostname = hostname if hostname is not None else name
+    self.username = username
+
+  def bash(self, command, stdin=None):
+    return _ssh_bash(self, command, stdin=stdin)
+
+class LocalHost(Host):
+  def __init__(self):
+    self.name = 'localhost'
+    self.hostname = 'localhost'
+    self.username = None
+
+  def bash(self, command, stdin=None):
+    return _local_bash(command, stdin=stdin)
+
+localhost = LocalHost()
+
 DEFAULTS = {
-  'hosts': None,
+  'directory': None,
+  'hosts': [localhost],
 }
+
+def _ensure_host(host):
+  if isinstance(host, Host):
+    return host
+  return SshHost(host)
 
 class ToolerEnv(object):
   def __init__(self):
@@ -22,7 +63,15 @@ class ToolerEnv(object):
     else:
       self.set(prop, value)
 
+  def add_hosts(self, hosts):
+    self.set(
+      'hosts',
+      (self.hosts if self.hosts else []) + hosts
+    )
+
   def set(self, prop, value):
+    if prop == 'hosts':
+      value = [_ensure_host(v) for v in value]
     self._stack[-1][prop] = value
 
   @contextmanager
@@ -37,5 +86,3 @@ class ToolerEnv(object):
     assert self._stack == original, (
       'Expected original stack after call to settings'
     )
-
-env = ToolerEnv()
