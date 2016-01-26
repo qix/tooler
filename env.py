@@ -1,39 +1,16 @@
-from collections import namedtuple
 from contextlib import contextmanager
 
+from .hosts import (
+  Host,
+  SshHost,
+  LocalHost,
+  localhost,
+)
 from .shell import (
   _local_bash,
   _ssh_bash
 )
 
-SshHost = namedtuple('SshHost', (
-  'username',
-  'hostname',
-  'name',
-))
-
-class Host(object):
-  pass
-
-class SshHost(Host):
-  def __init__(self, name, hostname=None, username=None):
-    self.name = name
-    self.hostname = hostname if hostname is not None else name
-    self.username = username
-
-  def bash(self, command, stdin=None):
-    return _ssh_bash(self, command, stdin=stdin)
-
-class LocalHost(Host):
-  def __init__(self):
-    self.name = 'localhost'
-    self.hostname = 'localhost'
-    self.username = None
-
-  def bash(self, command, stdin=None):
-    return _local_bash(command, stdin=stdin)
-
-localhost = LocalHost()
 
 DEFAULTS = {
   'directory': None,

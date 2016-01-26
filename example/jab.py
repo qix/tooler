@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 from tooler import (
-  add_submodule,
+  Tooler,
   command,
   proceed_or_abort,
-  run,
 )
 
 import photo
-add_submodule('photo', photo.tooler)
 
-@command
+tooler = Tooler()
+
+tooler.add_submodule('photo', photo.tooler)
+
+@tooler.command
 def off():
   proceed_or_abort()
   print('Called off!')
 
-
 if __name__ == '__main__':
-  run()
+  tooler.main()

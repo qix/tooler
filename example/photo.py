@@ -2,13 +2,14 @@ from tooler import (
   Tooler,
   bash,
   bash_quote,
+  docopt_parser,
   env,
   proceed_or_abort,
 )
 
 tooler = Tooler()
 
-@tooler.command(docopt=True)
+@tooler.command(parser=docopt_parser)
 def upload(arguments):
   """
 Usage: upload <photo> [options]

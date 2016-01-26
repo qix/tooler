@@ -5,6 +5,7 @@ from .active import set_active_tooler
 from .colors import yellow
 from .command import ToolerCommand
 from .env import ToolerEnv
+from .output import output_json
 from .shell import bash
 from .util import (
   abort,
@@ -71,17 +72,25 @@ class Tooler(object):
   def has_default(self):
     return True if self.default else False
 
-  def run(self, args=None, script_name=None):
+  def run(self, args=None, script_name=None, output=output_json):
     set_active_tooler(self)
 
     if args is None:
-      args = sys.argv
+      args = sys.argv[:]
       script_name = args.pop(0)
+
+    if type(args) in (bytes, str):
+      raise Exception('Tooler args cannot be bytes/string, use an array')
 
     # Super simple parser for tooler options
     toggles = {
       '--assume-defaults': False,
     }
+
+    # Check for basic bash command
+    if args and args[0] == '--':
+      self.bash(args[1:])
+      return
 
     idx = 0
     command = None
@@ -109,12 +118,23 @@ class Tooler(object):
     self.assume_defaults = toggles['--assume-defaults']
 
     if command in self.commands:
-      self.commands[command].run(selector, args)
+      result = self.commands[command].run(selector, args)
+      if result is not None and output is not None:
+        output(result)
+      return result
     elif command is None:
       self.usage()
+      return False
     else:
-      print('Unknown command', command)
+      print('Invalid command:', command)
+      self.usage()
+      return False
 
+  def main(self):
+    args = sys.argv[:]
+    script_name = args.pop(0)
+    result = self.run(args, script_name=script_name)
+    sys.exit(1 if result is False else 0)
 
   def usage(self, script_name='./script'):
     print('Usage: %s <command> [options...]')

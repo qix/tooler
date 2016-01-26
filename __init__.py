@@ -15,9 +15,13 @@ from .env import (
   SshHost,
   localhost,
 )
-from .shell import (
-  bash,
+from .output import (
+  write_status,
+  write_error,
+  write_warn,
+  write_okay,
 )
+from .shell import bash
 from .tooler import Tooler
 from .util import (
   abort,
@@ -38,13 +42,11 @@ def _not_implemented_decorator(fn):
   return decorated
 
 # Convenience methods run on the active tooler
-add_submodule = lambda *a, **k: _tooler().add_submodule(*a, **k)
 bash = lambda *a, **k: _tooler().bash(*a, **k)
 command = lambda *a, **k: _tooler().command(*a, **k)
 proceed = lambda *a, **k: _tooler().proceed(*a, **k)
 proceed_or_abort = lambda *a, **k: _tooler().proceed_or_abort(*a, **k)
 prompt = lambda *a, **k: _tooler().proceed_or_abort(*a, **k)
-run = lambda *a, **k: _tooler().run(*a, **k)
 settings = lambda *a, **k: _tooler().settings(*a, **k)
 
 # Add some compatability helpers for fabric migrations

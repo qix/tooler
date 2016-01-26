@@ -1,3 +1,3 @@
 from collections import namedtuple
 
-BashResult = namedtuple('BashResult', ('stdout', 'stderr'))
+BashResult = namedtuple('BashResult', ('code', 'stdout', 'stderr'))
