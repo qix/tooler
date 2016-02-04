@@ -1,11 +1,11 @@
 from functools import partial
 
 def colored(code, text, bold=False, ansi=True):
-  if not ansi:
-    return text
-  if bold:
-    code = '1;' + code
-  return "\033[%sm%s\033[0m" % (code, text)
+    if not ansi:
+        return text
+    if bold:
+        code = '1;' + code
+    return "\033[%sm%s\033[0m" % (code, text)
 
 blue = partial(colored, '34')
 cyan = partial(colored, '36')
