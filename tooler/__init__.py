@@ -48,7 +48,7 @@ def command(*a, **k):
 def proceed(*a, **k):
     return _tooler().proceed(*a, **k)
 def proceed_or_abort(*a, **k):
-    return _or_abort = lambda *a, **k: _tooler().proceed_or_abort(*a, **k)
+    return _tooler().proceed_or_abort(*a, **k)
 def prompt(*a, **k):
     return _tooler().prompt(*a, **k)
 def settings(*a, **k):

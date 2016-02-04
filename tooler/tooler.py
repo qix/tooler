@@ -194,16 +194,17 @@ class Tooler(object):
         self.usage(script_name)
         return False
 
-    def main(self, argv=None):
+    def main(self, argv=None, **kv):
         if argv is None:
             argv = sys.argv
         script_name = argv[0]
         args = argv[1:]
 
-        try:
-            result = self.run(args, script_name=script_name)
-        except ShellException as e:
-            self.abort('Shell command raised exception: %s' % str(e))
+        with self.settings(**kv):
+            try:
+                result = self.run(args, script_name=script_name)
+            except ShellException as e:
+                self.abort('Shell command raised exception: %s' % str(e))
         self.loop.close()
         sys.exit(1 if result is False else 0)
 

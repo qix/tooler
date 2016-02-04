@@ -36,7 +36,7 @@ local: Used 69G (72%) of / [/dev/mapper/ubuntu--vg-root]
 
 ```python
 from tooler import Tooler
-from tooler.library import named
+from tooler.library import (named, SshConfig)
 
 import disk
 
@@ -46,9 +46,8 @@ tooler.add_submodule('disk', disk.tooler)
 tooler.add_submodule('named', named.tooler)
 
 if __name__ == '__main__':
-    named.load_ssh_config()
-    tooler.main()
-
+    named.add_hosts(SshConfig().get_hosts())
+    tooler.main(hosts=[])
 ```
 
 ### Library of awesome sauce
