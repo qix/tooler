@@ -6,10 +6,10 @@ Tooler is a python3 library to create user friendly devops scripts in minutes.
 """
 
 from os import path
-from setuptools import setup
+from setuptools import (setup, find_packages)
 
 base = path.abspath(path.dirname(__file__))
-with open(path.join(base, 'README.md')) as f:
+with open(path.join(base, 'README.rst')) as f:
     readme = f.read()
 
 with open(path.join(base, 'tooler', 'version.py')) as version:
@@ -32,7 +32,7 @@ setup(
         'Pygments >= 2.1.0',
     ],
     extras_require={},
-    packages=['tooler'],
+    packages=find_packages(),
     scripts=[],
     test_suite='tests',
     classifiers=[

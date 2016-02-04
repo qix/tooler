@@ -1,6 +1,7 @@
 from functools import wraps
 from shlex import quote as shell_quote
 
+import tooler.library
 from .active import (
   get_active_tooler,
   set_active_tooler,
@@ -23,6 +24,12 @@ from .output import (
 )
 from .shell import bash
 from .tooler import Tooler
+from .version import (
+  __author__,
+  __author_email__,
+  __url__,
+  __version__,
+)
 
 def _tooler():
     tooler = get_active_tooler()

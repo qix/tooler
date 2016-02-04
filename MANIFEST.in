@@ -1,1 +1,1 @@
-include LICENSE README.md example/*.py tests/*.py
+include LICENSE README.rst example/*.py tests/*.py tooler/library
