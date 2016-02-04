@@ -54,6 +54,7 @@ class OutputHandler(object):
     prefix=True, capture=True, display=True, quiet=False
   ):
     self.command = command
+    self.host = host
     self.user = command.user or host.user
     self.is_current_user = (self.user == getpass.getuser())
 
@@ -62,48 +63,34 @@ class OutputHandler(object):
     self.prefix = prefix
     self.quiet = quiet
 
-    full_host = host.name
-
-    # Root is represented by a symbol
-    if self.user not in (None, 'root'):
-      full_host = '%s@%s' % (self.user, full_host)
-
-    # Simple skip out the localhost unless it's an interesting user
-    if isinstance(host, LocalHost):
-      if self.user in (None, 'root', getpass.getuser()):
-        full_host = 'local'
-    self.full_host = full_host
-
   def open(self):
     if self.quiet:
       return
-    symbol = '#' if self.user == 'root' else '$'
-    sys.stderr.write(grey('%s%s %s\n' % (
-      self.full_host, symbol, self.command.string
-    )))
+    self.host.print(
+      grey(self.command.string),
+      symbol='#' if self.user == 'root' else '$'
+    )
+
+
+  @asyncio.coroutine
+  def _read_encoded(self, stream):
+    if stream is None:
+      return None
+    data = yield from stream.read()
+    return data.decode('utf-8')
 
   @asyncio.coroutine
   def collect(self, stdout_stream, stderr_stream):
-    if self.display:
-      stdout_tailer = self._tail_stream(grey('%s> ' % (
-        self.full_host,
-      )) if self.prefix else '', stdout_stream)
+    if not self.display:
+      return (yield from asyncio.gather(
+        self._read_encoded(stdout_stream),
+        self._read_encoded(stderr_stream)
+      ))
 
-      if stderr_stream:
-        stderr_tailer = self._tail_stream(grey('%s! ' % (
-          self.full_host
-        )) if self.prefix else '', stderr_stream)
-
-      stdout_data = yield from stdout_tailer
-      if stderr_stream:
-        stderr_data = yield from stderr_tailer
-    else:
-      stdout_data = yield from stdout_stream.read()
-      stdout_data = stdout_data.decode('utf-8')
-      if stderr_stream:
-        stderr_data = yield from stderr_stream.read()
-        stderr_data = stderr_data.decode('utf-8')
-    return (stdout_data, stderr_data if stderr_stream else None)
+    return (yield from asyncio.gather(
+      self._tail_stream('>', stdout_stream),
+      self._tail_stream('>', stderr_stream),
+    ))
 
   def close(self, return_code):
     if self.quiet:
@@ -113,18 +100,18 @@ class OutputHandler(object):
     ) + ']')
 
     if return_code == 0:
-      sys.stderr.write(grey(self.full_host + ':') + ' ' + symbol + '\n')
+      self.host.print(symbol)
     else:
-      sys.stderr.write(
-        grey(self.full_host) + ': ' + symbol + ' ' +
-        'exit with %d\n' % return_code
-      )
+      self.host.print('%s exit with %d' % (symbol, return_code))
 
   def exception(self, exc):
-    write_error('%s failed: %s' % (self.full_host, str(exc)))
+    self.host.print(red('[ERR!]', bold=True) + ' ' + str(exc))
 
   @asyncio.coroutine
-  def _tail_stream(self, prefix, stream):
+  def _tail_stream(self, symbol, stream):
+    if stream is None:
+      return None
+
     # Don't write blank lines at the end
     line = True
     captured = []
@@ -134,7 +121,7 @@ class OutputHandler(object):
       line_promise = stream.readline()
       line_data = yield from line_promise
 
-      # @TODO: 
+      # @TODO: give warnings if no data is coming in
       # while True:
       #   try:
       #     line_data = yield from wait_for(shield(line_promise), 15)
@@ -148,8 +135,9 @@ class OutputHandler(object):
       if not line.strip():
         empty_lines += 1
       else:
-        sys.stderr.write((prefix + '\n') * empty_lines)
-        sys.stderr.write(prefix + line.rstrip() + '\n')
+        for index in range(empty_lines):
+          self.host.print(symbol=self.symbol)
+        self.host.print(line.rstrip(), symbol=symbol)
         empty_lines = 0
     return ''.join(captured) if self.capture else None
 
@@ -179,7 +167,7 @@ def _local_bash(env, host, command, output, tty=None, user=None, stdin=None):
   yield from proc.wait()
   output.close(proc.returncode)
 
-  return BashResult(proc.returncode, stdout, stderr)
+  return BashResult(host, proc.returncode, stdout, stderr)
 
 @asyncio.coroutine
 def _ssh_bash(env, host, command, output, tty=None, stdin=None):
@@ -228,7 +216,7 @@ def _ssh_bash(env, host, command, output, tty=None, stdin=None):
 
     output.close(status)
 
-    return BashResult(status, stdout_data, stderr_data)
+    return BashResult(host, status, stdout_data, stderr_data)
 
 def bash(
   env, command,

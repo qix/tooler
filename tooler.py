@@ -1,3 +1,4 @@
+import asyncio
 import sys
 from functools import wraps
 
@@ -197,7 +198,9 @@ class Tooler(object):
       argv = sys.argv
     script_name = argv[0]
     args = argv[1:]
+    loop = asyncio.get_event_loop()
     result = self.run(args, script_name=script_name)
+    loop.close()
     sys.exit(1 if result is False else 0)
 
   def usage(self, script_name='./script'):

@@ -1,5 +1,5 @@
 from functools import wraps
-from shlex import quote as bash_quote
+from shlex import quote as shell_quote
 
 from .active import (
   get_active_tooler,
