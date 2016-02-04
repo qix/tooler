@@ -49,12 +49,18 @@ class BashCommand(object):
     self.full_string = ' '.join([quote(arg) for arg in self.full])
 
 class OutputHandler(object):
-  def __init__(self, host, command, capture=True, display=True):
-    self.capture = capture
+  def __init__(
+    self, host, command,
+    prefix=True, capture=True, display=True, quiet=False
+  ):
     self.command = command
-    self.display = display
     self.user = command.user or host.user
     self.is_current_user = (self.user == getpass.getuser())
+
+    self.capture = capture
+    self.display = display
+    self.prefix = prefix
+    self.quiet = quiet
 
     full_host = host.name
 
@@ -69,6 +75,8 @@ class OutputHandler(object):
     self.full_host = full_host
 
   def open(self):
+    if self.quiet:
+      return
     symbol = '#' if self.user == 'root' else '$'
     sys.stderr.write(grey('%s%s %s\n' % (
       self.full_host, symbol, self.command.string
@@ -79,11 +87,12 @@ class OutputHandler(object):
     if self.display:
       stdout_tailer = self._tail_stream(grey('%s> ' % (
         self.full_host,
-      )), stdout_stream)
+      )) if self.prefix else '', stdout_stream)
+
       if stderr_stream:
         stderr_tailer = self._tail_stream(grey('%s! ' % (
           self.full_host
-        )), stderr_stream)
+        )) if self.prefix else '', stderr_stream)
 
       stdout_data = yield from stdout_tailer
       if stderr_stream:
@@ -97,6 +106,8 @@ class OutputHandler(object):
     return (stdout_data, stderr_data if stderr_stream else None)
 
   def close(self, return_code):
+    if self.quiet:
+      return
     symbol = grey('[' + (
       green(BOLD_CHECKMARK) if return_code == 0 else red(BOLD_CROSS)
     ) + ']')
@@ -143,7 +154,7 @@ class OutputHandler(object):
     return ''.join(captured) if self.capture else None
 
 @asyncio.coroutine
-def _local_bash(host, command, output, tty=False, user=None, stdin=None):
+def _local_bash(env, host, command, output, tty=None, user=None, stdin=None):
   assert type(stdin) in (type(None), bytes, str), 'restrictions for now'
 
   if type(stdin) is str:
@@ -171,7 +182,7 @@ def _local_bash(host, command, output, tty=False, user=None, stdin=None):
   return BashResult(proc.returncode, stdout, stderr)
 
 @asyncio.coroutine
-def _ssh_bash(host, command, output, tty=False, stdin=None):
+def _ssh_bash(env, host, command, output, tty=None, stdin=None):
   assert type(stdin) in (type(None), bytes, str), 'restrictions for now'
 
   connection_options = {
@@ -180,6 +191,9 @@ def _ssh_bash(host, command, output, tty=False, stdin=None):
 
   if host.trust_host_key:
     connection_options['known_hosts'] = None
+
+  if tty is None:
+    tty = env.tty
 
   with (yield from asyncssh.connect(
     host.hostname,
@@ -205,11 +219,8 @@ def _ssh_bash(host, command, output, tty=False, stdin=None):
       stdout_stream, stderr_stream if not tty else None
     )
 
-    stdout_stream.channel.close()
     yield from stdout_stream.channel.wait_closed()
 
-    # @TODO: Ideally `wait_for_exit` is coming soon
-    yield from sleep(5)
     status = stdout_stream.channel.get_exit_status()
 
     if status is None:
@@ -219,26 +230,37 @@ def _ssh_bash(host, command, output, tty=False, stdin=None):
 
     return BashResult(status, stdout_data, stderr_data)
 
-def bash(env, command, directory=None, user=None, capture=True, display=True, **kv):
+def bash(
+  env, command,
+  hosts=None, directory=None, user=None,
+  quiet=False, capture=True, display=True, prefix=True,
+  **kv
+):
   command = BashCommand(
     command,
     user=user,
     directory=directory or env.directory,
   )
 
+  if hosts is None:
+    hosts = env.hosts
+
   loop = asyncio.get_event_loop()
   tasks = []
 
   outputs = [
-    OutputHandler(host, command, capture=capture, display=display)
-    for host in env.hosts
+    OutputHandler(
+      host, command,
+      capture=capture, display=display, quiet=quiet, prefix=prefix,
+    )
+    for host in hosts
   ]
 
-  for (host, output) in zip(env.hosts, outputs):
+  for (host, output) in zip(hosts, outputs):
     if isinstance(host, LocalHost):
-      tasks.append(_local_bash(host, command, output, **kv))
+      tasks.append(_local_bash(env, host, command, output, **kv))
     elif isinstance(host, SshHost):
-      tasks.append(_ssh_bash(host, command, output, **kv))
+      tasks.append(_ssh_bash(env, host, command, output, **kv))
     else:
       raise Exception('Unknown host type: %s' % host)
 

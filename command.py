@@ -4,7 +4,13 @@ import re
 from docopt import docopt as _docopt
 from inspect import Parameter
 
-ARG_REGEX = re.compile(r'^--([a-z]+(-[a-z]+)*)$')
+from .output import write_error
+
+ARG_REGEX = re.compile(r'^--([a-z]+(?:-[a-z]+)*)(?:=(.*))?$')
+
+class CommandParseException(Exception):
+  def __init__(self, message):
+    super().__init__(message)
 
 def default_parser(fn, doc, selector, args):
   signature = inspect.signature(fn)
@@ -23,43 +29,63 @@ def default_parser(fn, doc, selector, args):
       idx += 1
     else:
       match = re.match(ARG_REGEX, args[idx])
+      idx += 1
+
       if not match:
         raise Exception('Could not identify argument: %s', args[idx])
-      elif idx + 1 >= len(args):
-        raise Exception('No value for argument: %s', args[idx])
 
-      key = match.groups(1)
+      (key, value) = match.groups()
       if key in keyword:
         raise Exception('Value already set: ' + key)
-      keyword[key] = args[idx + 1]
-      idx += 2
 
-  output = {}
+      # "--arg <value>" style; read value out of next argument
+      if value is None:
+        if idx >= len(args):
+          raise Exception('No value for argument: %s' % args[idx])
+        value = args[idx]
+        idx += 1
+
+      keyword[key] = value
+
+  args = []
+  kv = {}
+
   for key, param in signature.parameters.items():
-    if positional:
-      output[key] = positional.pop(0)
+    if param.kind == Parameter.VAR_POSITIONAL:
+      # *args, take reset of positional arguments
+      args.extend(positional)
+      positional = []
+    elif positional:
+      # If there is anything left in positional; send it as a normal argument
+      args.append(positional.pop(0))
     elif param.kind == Parameter.VAR_KEYWORD:
       # **kv, take rest of keyword arguments
       for key, value in keyword.items():
-        if key in output:
+        if key in kv:
           raise Exception('Multiple values for key: ' + key)
-        output[key] = value
+        kv[key] = value
       keyword = {}
     else:
       if key in keyword:
-        output[key] = keyword.pop(key)
+        kv[key] = keyword.pop(key)
       elif param.default != inspect._empty:
-        output[key] = param.default
+        kv[key] = param.default
       else:
         raise Exception('No default set for: ' + key)
-  return ([], output)
+
+  if positional or keyword:
+    raise CommandParseException(
+      'Unused arguments: %s' % ' '.join(positional + list(keyword.keys()))
+    )
+
+  return (tuple(args), kv)
 
 def docopt_parser(fn, doc, selector, args):
   assert selector is None, 'selector not valid with docopt'
   return ((_docopt(doc.strip(), argv=args),), {})
 
 def raw_parser(fn, doc, selector, args):
-  return ((selector, args), {})
+  return ((selector, tuple(args)), {})
 
 class ToolerCommand(object):
   def __init__(self, name, fn, doc=None, parser=None):

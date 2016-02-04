@@ -15,6 +15,7 @@ from .shell import (
 DEFAULTS = {
   'directory': None,
   'hosts': [localhost],
+  'tty': True,
 }
 
 def _ensure_host(host):

@@ -46,11 +46,11 @@ bash = lambda *a, **k: _tooler().bash(*a, **k)
 command = lambda *a, **k: _tooler().command(*a, **k)
 proceed = lambda *a, **k: _tooler().proceed(*a, **k)
 proceed_or_abort = lambda *a, **k: _tooler().proceed_or_abort(*a, **k)
-prompt = lambda *a, **k: _tooler().proceed_or_abort(*a, **k)
+prompt = lambda *a, **k: _tooler().prompt(*a, **k)
 settings = lambda *a, **k: _tooler().settings(*a, **k)
 
 # Add some compatability helpers for fabric migrations
-local = lambda *a, **k: _tooler().bash(*a, hosts=[LocalHost], **k)
+local = lambda *a, **k: _tooler().bash(*a, hosts=[localhost], **k)[0]
 sudo = lambda *a, **k: _tooler().bash(*a, user='root', **k)
 task = command
 execute = lambda func, *a, **k: func(*a, **k)
@@ -62,10 +62,6 @@ serial = _not_implemented_decorator
 
 def cd(path):
   return settings(directory=path)
-
-def local(*a, **k):
-  with settings(hosts=[localhost]):
-    return bash(*a, **k)[0]
 
 def runs_once(fn):
   results = {}
