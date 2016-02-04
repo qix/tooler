@@ -22,12 +22,15 @@ from .hosts import (
   localhost,
 )
 from .output import write_error
-from .result import BashResult
+from .result import ShellResult
 
 PIPE = object()
 
 BOLD_CHECKMARK = "\u2714"
 BOLD_CROSS = "\u2718"
+
+class ShellException(Exception):
+  pass
 
 class BashCommand(object):
   def __init__(self, command, user=None, directory=None):
@@ -136,7 +139,7 @@ class OutputHandler(object):
         empty_lines += 1
       else:
         for index in range(empty_lines):
-          self.host.print(symbol=self.symbol)
+          self.host.print(symbol=symbol)
         self.host.print(line.rstrip(), symbol=symbol)
         empty_lines = 0
     return ''.join(captured) if self.capture else None
@@ -167,7 +170,7 @@ def _local_bash(env, host, command, output, tty=None, user=None, stdin=None):
   yield from proc.wait()
   output.close(proc.returncode)
 
-  return BashResult(host, proc.returncode, stdout, stderr)
+  return ShellResult(host, proc.returncode, stdout, stderr)
 
 @asyncio.coroutine
 def _ssh_bash(env, host, command, output, tty=None, stdin=None):
@@ -212,11 +215,11 @@ def _ssh_bash(env, host, command, output, tty=None, stdin=None):
     status = stdout_stream.channel.get_exit_status()
 
     if status is None:
-      raise Exception('Received a null status from ssh channel')
+      raise ShellException('Received a null status from ssh channel')
 
     output.close(status)
 
-    return BashResult(host, status, stdout_data, stderr_data)
+    return ShellResult(host, status, stdout_data, stderr_data)
 
 def bash(
   env, command,
@@ -250,7 +253,7 @@ def bash(
     elif isinstance(host, SshHost):
       tasks.append(_ssh_bash(env, host, command, output, **kv))
     else:
-      raise Exception('Unknown host type: %s' % host)
+      raise ShellException('Unknown host type: %s' % host)
 
   result = asyncio.gather(*tasks, return_exceptions=True)
   loop.run_until_complete(result)
@@ -261,13 +264,15 @@ def bash(
   bash_results = []
   for task_result, output in zip(result.result(), outputs):
     # If we had a good bash result, append it to the list
-    if isinstance(task_result, BashResult):
+    if isinstance(task_result, ShellResult):
       if task_result.code == 0:
         bash_results.append(task_result)
         continue
-      task_result = Exception('Task exited with non-zero code')
+      task_result = ShellException('Task exited with non-zero code')
 
-    assert isinstance(task_result, Exception), 'Expected exception'
+    assert isinstance(task_result, Exception), (
+      'Shell calls should either return an Exception or ShellResult'
+    )
     output.exception(task_result)
     first_exception = first_exception or task_result
 

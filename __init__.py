@@ -23,9 +23,6 @@ from .output import (
 )
 from .shell import bash
 from .tooler import Tooler
-from .util import (
-  abort,
-)
 
 def _tooler():
   tooler = get_active_tooler()
@@ -42,6 +39,7 @@ def _not_implemented_decorator(fn):
   return decorated
 
 # Convenience methods run on the active tooler
+abort = lambda *a, **k: _tooler().abort(*a, **k)
 bash = lambda *a, **k: _tooler().bash(*a, **k)
 command = lambda *a, **k: _tooler().command(*a, **k)
 proceed = lambda *a, **k: _tooler().proceed(*a, **k)

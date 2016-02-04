@@ -16,9 +16,9 @@ from .output import (
   output_json,
   write_error,
 )
-from .shell import bash
-from .util import (
-  abort,
+from .shell import (
+  ShellException,
+  bash,
 )
 
 class Tooler(object):
@@ -36,6 +36,8 @@ class Tooler(object):
     self.default = None
     self.root = self
     self.parent = None
+
+    self.loop = asyncio.get_event_loop()
 
     self.namespace = set()
 
@@ -188,7 +190,6 @@ class Tooler(object):
         ))
         return False
 
-
     write_error('Invalid command: %s' % command)
     self.usage(script_name)
     return False
@@ -198,14 +199,17 @@ class Tooler(object):
       argv = sys.argv
     script_name = argv[0]
     args = argv[1:]
-    loop = asyncio.get_event_loop()
-    result = self.run(args, script_name=script_name)
-    loop.close()
+
+    try:
+      result = self.run(args, script_name=script_name)
+    except ShellException as e:
+      self.abort('Shell command raised exception: %s' % str(e))
+    self.loop.close()
     sys.exit(1 if result is False else 0)
 
   def usage(self, script_name='./script'):
     prefix = script_name + ' '  if script_name else ''
-    
+
     print('Usage: %s<command> [options...]' % prefix)
     print('')
     print('Available commands:')
@@ -219,6 +223,11 @@ class Tooler(object):
 
     print('')
     print('Use \'%s<command> --help\' for help on a single command' % prefix)
+
+  def abort(self, message):
+    write_error(message, code='ABORT')
+    self.loop.close()
+    sys.exit(1)
 
   def prompt(
     self, message,
@@ -260,7 +269,7 @@ class Tooler(object):
 
     except EOFError:
       sys.stdout.write('\n')
-      abort('Could not read prompt from stdin.')
+      self.abort('Could not read prompt from stdin.')
     except KeyboardInterrupt:
       sys.stdout.write('\n')
       sys.exit(1)
@@ -288,7 +297,7 @@ class Tooler(object):
 
   def proceed_or_abort(self, message=None, default=False):
     if not self.proceed(message, default=default):
-      abort('User requested not to proceed.')
+      self.abort('User requested not to proceed.')
 
   def bash(self, *args, **kv):
     return bash(self.env, *args, **kv)

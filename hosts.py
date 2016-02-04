@@ -13,7 +13,7 @@ SshHost = namedtuple('SshHost', (
 ))
 
 class Host(object):
-  def print(self, message, symbol=':', user=None, **kv):
+  def print(self, message='', symbol=':', user=None, **kv):
     # @TODO: Ideally this could take multiline messages, and similar print()
     # arguments.
 
