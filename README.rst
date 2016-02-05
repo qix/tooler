@@ -3,14 +3,15 @@ Tooler: Easier, better, faster python devops scripts
 
 Features:
 
- * Simple access to local or remote (via asyncssh) shells
- * Neat legible output from multiple hosts
+* Simple access to local or remote (via asyncssh) shells
+* Neat legible output from multiple hosts
 
 
 Simple access to bash:
 ----------------------
 
 .. code:: python
+
   import shlex
   from tooler import Tooler
 
@@ -26,7 +27,8 @@ Simple access to bash:
       tooler.main()
 
 
-..
+.. code:: bash
+
   $ ./disk.py free --mount=/
   local$ df -mah | grep '/$'
   local> /dev/mapper/ubuntu--vg-root  102G   69G   28G  72% /
@@ -37,6 +39,7 @@ Subcommands made easy:
 ----------------------
 
 .. code:: python
+
   from tooler import Tooler
   from tooler.library import (named, SshConfig)
 
@@ -54,7 +57,8 @@ Subcommands made easy:
 Library of awesome sauce:
 -------------------------
 
-..
+.. code:: bash
+
   $ ./tool.py named:nginx* disk.free
   $ s named:nginx* free
   nginx1$ df -mah | grep '/$'
@@ -73,8 +77,8 @@ Library of awesome sauce:
 Thanks required:
 ----------------
 
- * asyncssh_  for an easy to use ssh client
- * fabric_ & baker_ as inspiration
+* asyncssh_  for an easy to use ssh client
+* fabric_ & baker_ as inspiration
 
 .. _asyncssh: https://github.com/ronf/asyncssh
 .. _baker: https://bitbucket.org/mchaput/baker
