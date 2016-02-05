@@ -16,6 +16,7 @@ DEFAULTS = {
   'directory': None,
   'hosts': [localhost],
   'tty': True,
+  'trust_host_key': False,
 }
 
 def _ensure_host(host):

@@ -32,7 +32,7 @@ class Host(object):
 
 
 class SshHost(Host):
-    def __init__(self, name, hostname=None, user=None, port=22, trust_host_key=False):
+    def __init__(self, name, hostname=None, user=None, port=22, trust_host_key=None):
         self.name = name
         self.hostname = hostname if hostname is not None else name
         self.user = user

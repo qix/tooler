@@ -33,6 +33,11 @@ setup(
     ],
     extras_require={},
     packages=find_packages(),
+    entry_points={
+        'console_scripts': [
+            'tooler-ssh = tooler.main:ssh',
+        ]
+    },
     scripts=[],
     test_suite='tests',
     classifiers=[

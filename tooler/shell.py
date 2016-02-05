@@ -184,7 +184,11 @@ def _ssh_bash(env, host, command, output, tty=None, stdin=None):
       'agent_forwarding': True,
     }
 
-    if host.trust_host_key:
+    trust_host_key = host.trust_host_key
+    if trust_host_key is None:
+      trust_host_key = env.trust_host_key
+
+    if trust_host_key:
         connection_options['known_hosts'] = None
 
     if tty is None:
