@@ -21,6 +21,7 @@ def human_filesize(value):
         value /= 1024.0
     return '%.1f%s' % (value, 'tb')
 
+
 def _wrap(message, indent=0):
     lines = message.split('\n')
     return '\n'.join([
@@ -35,6 +36,7 @@ def _wrap(message, indent=0):
       for idx in range(len(lines))
     ])
 
+
 def output_json(body):
     json_string = json.dumps(
       body,
@@ -43,6 +45,7 @@ def output_json(body):
       ensure_ascii=False
     )
     print(highlight(json_string, JsonLexer(), TerminalFormatter()), end='')
+
 
 def write_message(prefix, message=None, wrap=True, prefix_length=None):
     if message is None:
@@ -56,6 +59,7 @@ def write_message(prefix, message=None, wrap=True, prefix_length=None):
     sys.stderr.write(msg + '\n')
     sys.stderr.flush()
 
+
 def _write_coded(code, message, color=None, bold=False):
     prefix = '[%s]' % code
     prefix_length = len(prefix)
@@ -63,14 +67,18 @@ def _write_coded(code, message, color=None, bold=False):
         prefix = color(prefix, bold=bold)
     write_message(prefix + ' ', message, prefix_length=prefix_length+1)
 
+
 def write_error(message, code='ERR!'):
     _write_coded(code, message, color=red, bold=True)
+
 
 def write_status(message, code='STAT'):
     _write_coded(code, message, color=blue, bold=True)
 
+
 def write_okay(message, code='OKAY'):
     _write_coded(code, message, color=green, bold=True)
+
 
 def write_warn(message, code='WARN'):
     _write_coded(code, message, color=yellow, bold=True)

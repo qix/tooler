@@ -17,6 +17,7 @@ def _assert_parsed(parser, fn, selector, command, *args, **kv):
       (args, kv)
     )
 
+
 class TestDefaultParser(object):
     def test_var_args(self):
         def fn(*args, **va):
@@ -45,6 +46,7 @@ class TestDefaultParser(object):
           'one'
         )
 
+
 class TestDocoptParser(object):
     def test_basic(self):
         '''
@@ -62,14 +64,15 @@ class TestDocoptParser(object):
         _assert_parsed(
           docopt_parser, fn, None,
           'first',
-          { '<name>': 'first', '--simple': None }
+          {'<name>': 'first', '--simple': None}
         )
 
         _assert_parsed(
           docopt_parser, fn, None,
           'first --simple=second',
-          { '<name>': 'first', '--simple': 'second' }
+          {'<name>': 'first', '--simple': 'second'}
         )
+
 
 class TestRawParser(object):
     def test_basic(self):
