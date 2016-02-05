@@ -36,8 +36,7 @@ class ShellException(Exception):
 
 class BashCommand(object):
     def __init__(self, command, user=None, directory=None):
-
-        if type(command) is list:
+        if type(command) in (list, tuple):
             command = ' '.join([quote(arg) for arg in command])
 
         self.directory = directory
