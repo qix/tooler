@@ -4,22 +4,23 @@ from functools import wraps
 
 from .active import set_active_tooler
 from .colors import (
-  red,
-  yellow,
+    red,
+    yellow,
 )
 from .command import (
-  CommandParseException,
-  ToolerCommand,
+    CommandParseException,
+    ToolerCommand,
 )
 from .env import ToolerEnv
 from .output import (
-  output_json,
-  write_error,
+    output_json,
+    write_error,
 )
 from .shell import (
-  ShellException,
-  bash,
+    ShellException,
+    bash,
 )
+
 
 class Tooler(object):
 
@@ -48,7 +49,8 @@ class Tooler(object):
 
     def command(self, fn=None, name=None, alias=[], default=False, parser=None):
         # This function creates a decorator. If we were passed a function here then
-        # we need to first create the decorator and then pass the function to it.
+        # we need to first create the decorator and then pass the function to
+        # it.
         if fn is not None:
             return self.command()(fn)
 
@@ -58,10 +60,10 @@ class Tooler(object):
                 return fn(*args, **kv)
 
             self.add_command(fn.__name__ if name is None else name, ToolerCommand(
-              fn.__name__,
-              fn,
-              doc=fn.__doc__,
-              parser=parser,
+                fn.__name__,
+                fn,
+                doc=fn.__doc__,
+                parser=parser,
             ), default=default)
 
             return decorated
@@ -121,7 +123,7 @@ class Tooler(object):
 
         # Super simple parser for tooler options
         toggles = {
-          '--assume-defaults': False,
+            '--assume-defaults': False,
         }
 
         # Check for basic bash command. If there are multiple arguments treat them
@@ -163,7 +165,8 @@ class Tooler(object):
         seen = set()
         while command in self.aliases:
             if command in seen:
-                raise Exception('Infinite loop in aliases: %s' % (', '.join(seen)))
+                raise Exception('Infinite loop in aliases: %s' %
+                                (', '.join(seen)))
             seen.add(command)
             command = self.aliases[command]
 
@@ -186,7 +189,7 @@ class Tooler(object):
             submodule_name = '.'.join(splits[:length])
             if submodule_name in self.failed_submodules:
                 write_error('Failed to load submodule %s: %s' % (
-                  submodule_name, self.failed_submodules[submodule_name]
+                    submodule_name, self.failed_submodules[submodule_name]
                 ))
                 return False
 
@@ -209,18 +212,19 @@ class Tooler(object):
         sys.exit(1 if result is False else 0)
 
     def usage(self, script_name='./script'):
-        prefix = script_name + ' '  if script_name else ''
+        prefix = script_name + ' ' if script_name else ''
 
         print('Usage: %s<command> [options...]' % prefix)
         print('')
         print('Available commands:')
 
         available_commands = (
-          list(self.commands.keys()) +
-          list(self.failed_submodules.keys())
+            list(self.commands.keys()) +
+            list(self.failed_submodules.keys())
         )
         for command in sorted(available_commands):
-            print('  %s' % (red(command) if command in self.failed_submodules else command))
+            print('  %s' % (red(command)
+                            if command in self.failed_submodules else command))
 
         print('')
         print('Use \'%s<command> --help\' for help on a single command' % prefix)
@@ -231,24 +235,24 @@ class Tooler(object):
         sys.exit(1)
 
     def prompt(
-      self, message,
-      options=None,
-      default=None,
-      strip=True,
-      lower=False,
-      suggestion=None,
+        self, message,
+        options=None,
+        default=None,
+        strip=True,
+        lower=False,
+        suggestion=None,
     ):
         # Sanity check
         if options is not None:
             assert default is None or default in options, (
-              'The default value must be an option'
+                'The default value must be an option'
             )
 
         if default is not None and self.assume_defaults:
             print(message)
-            print(yellow('Assuming default option:'), yellow(default, bold=True))
+            print(yellow('Assuming default option:'),
+                  yellow(default, bold=True))
             return default
-
 
         if default is not None and suggestion is None:
             suggestion = default
@@ -280,19 +284,19 @@ class Tooler(object):
             message = self.default_proceed_message
 
         answers = {
-          'y': True,
-          'yes': True,
-          'n': False,
-          'no': False,
+            'y': True,
+            'yes': True,
+            'n': False,
+            'no': False,
         }
 
         suggestion = ' [y/n]'
         result = self.prompt(
-          message,
-          options=answers.keys(),
-          default='y' if default else 'n',
-          suggestion='Y/n' if default else 'y/N',
-          lower=True,
+            message,
+            options=answers.keys(),
+            default='y' if default else 'n',
+            suggestion='Y/n' if default else 'y/N',
+            lower=True,
         )
         return answers[result]
 

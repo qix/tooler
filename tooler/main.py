@@ -5,6 +5,7 @@ tooler = Tooler()
 
 tooler.add_submodule('named', named.tooler)
 
+
 def ssh():
     named.add_hosts(SshConfig().get_hosts())
 
@@ -16,4 +17,3 @@ def ssh():
 
 if __name__ == '__main__':
     ssh()
-

@@ -3,23 +3,23 @@ import asyncssh
 import getpass
 import sys
 from asyncio import (
-  shield,
-  sleep,
-  subprocess,
-  wait_for,
+    shield,
+    sleep,
+    subprocess,
+    wait_for,
 )
 from io import BytesIO
 from shlex import quote
 
 from .colors import (
-  green,
-  grey,
-  red,
+    green,
+    grey,
+    red,
 )
 from .hosts import (
-  LocalHost,
-  SshHost,
-  localhost,
+    LocalHost,
+    SshHost,
+    localhost,
 )
 from .output import write_error
 from .result import ShellResult
@@ -35,6 +35,7 @@ class ShellException(Exception):
 
 
 class BashCommand(object):
+
     def __init__(self, command, user=None, directory=None):
         if type(command) in (list, tuple):
             command = ' '.join([quote(arg) for arg in command])
@@ -54,9 +55,10 @@ class BashCommand(object):
 
 
 class OutputHandler(object):
+
     def __init__(
-      self, host, command,
-      prefix=True, capture=True, display=True, quiet=False
+        self, host, command,
+        prefix=True, capture=True, display=True, quiet=False
     ):
         self.command = command
         self.host = host
@@ -72,10 +74,9 @@ class OutputHandler(object):
         if self.quiet:
             return
         self.host.print(
-          grey(self.command.string),
-          symbol='#' if self.user == 'root' else '$'
+            grey(self.command.string),
+            symbol='#' if self.user == 'root' else '$'
         )
-
 
     @asyncio.coroutine
     def _read_encoded(self, stream):
@@ -88,20 +89,20 @@ class OutputHandler(object):
     def collect(self, stdout_stream, stderr_stream):
         if not self.display:
             return (yield from asyncio.gather(
-              self._read_encoded(stdout_stream),
-              self._read_encoded(stderr_stream)
+                self._read_encoded(stdout_stream),
+                self._read_encoded(stderr_stream)
             ))
 
         return (yield from asyncio.gather(
-          self._tail_stream('>', stdout_stream),
-          self._tail_stream('>', stderr_stream),
+            self._tail_stream('>', stdout_stream),
+            self._tail_stream('>', stderr_stream),
         ))
 
     def close(self, return_code):
         if self.quiet:
             return
         symbol = grey('[' + (
-          green(BOLD_CHECKMARK) if return_code == 0 else red(BOLD_CROSS)
+            green(BOLD_CHECKMARK) if return_code == 0 else red(BOLD_CROSS)
         ) + ']')
 
         if return_code == 0:
@@ -156,10 +157,10 @@ def _local_bash(env, host, command, output, tty=None, user=None, stdin=None):
 
     output.open()
     proc = yield from asyncio.create_subprocess_shell(
-      command.full_string,
-      stdin=subprocess.PIPE if stdin else None,
-      stdout=subprocess.PIPE,
-      stderr=subprocess.PIPE,
+        command.full_string,
+        stdin=subprocess.PIPE if stdin else None,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
     )
 
     collect_promise = output.collect(proc.stdout, proc.stderr)
@@ -181,12 +182,12 @@ def _ssh_bash(env, host, command, output, tty=None, stdin=None):
     assert type(stdin) in (type(None), bytes, str), 'restrictions for now'
 
     connection_options = {
-      'agent_forwarding': True,
+        'agent_forwarding': True,
     }
 
     trust_host_key = host.trust_host_key
     if trust_host_key is None:
-      trust_host_key = env.trust_host_key
+        trust_host_key = env.trust_host_key
 
     if trust_host_key:
         connection_options['known_hosts'] = None
@@ -195,17 +196,17 @@ def _ssh_bash(env, host, command, output, tty=None, stdin=None):
         tty = env.tty
 
     with (yield from asyncssh.connect(
-      host.hostname,
-      **connection_options
+        host.hostname,
+        **connection_options
     )) as conn:
         output.open()
 
         (stdin_stream, stdout_stream, stderr_stream) = (
-          yield from conn.open_session(
-            command.full_string,
-            term_type='xterm-color' if tty else None,
-            encoding=None,
-          )
+            yield from conn.open_session(
+                command.full_string,
+                term_type='xterm-color' if tty else None,
+                encoding=None,
+            )
         )
 
         if stdin:
@@ -215,7 +216,7 @@ def _ssh_bash(env, host, command, output, tty=None, stdin=None):
             stdin_stream.write_eof()
 
         (stdout_data, stderr_data) = yield from output.collect(
-          stdout_stream, stderr_stream if not tty else None
+            stdout_stream, stderr_stream if not tty else None
         )
 
         yield from stdout_stream.channel.wait_closed()
@@ -231,15 +232,15 @@ def _ssh_bash(env, host, command, output, tty=None, stdin=None):
 
 
 def bash(
-  env, command,
-  hosts=None, directory=None, user=None,
-  quiet=False, capture=True, display=True, prefix=True,
-  **kv
+    env, command,
+    hosts=None, directory=None, user=None,
+    quiet=False, capture=True, display=True, prefix=True,
+    **kv
 ):
     command = BashCommand(
-      command,
-      user=user,
-      directory=directory or env.directory,
+        command,
+        user=user,
+        directory=directory or env.directory,
     )
 
     if hosts is None:
@@ -249,11 +250,11 @@ def bash(
     tasks = []
 
     outputs = [
-      OutputHandler(
-        host, command,
-        capture=capture, display=display, quiet=quiet, prefix=prefix,
-      )
-      for host in hosts
+        OutputHandler(
+            host, command,
+            capture=capture, display=display, quiet=quiet, prefix=prefix,
+        )
+        for host in hosts
     ]
 
     for (host, output) in zip(hosts, outputs):
@@ -280,7 +281,7 @@ def bash(
             task_result = ShellException('Task exited with non-zero code')
 
         assert isinstance(task_result, Exception), (
-          'Shell calls should either return an Exception or ShellResult'
+            'Shell calls should either return an Exception or ShellResult'
         )
         output.exception(task_result)
         first_exception = first_exception or task_result

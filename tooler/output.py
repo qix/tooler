@@ -7,12 +7,13 @@ from pygments.formatters import TerminalFormatter
 from pygments.lexers import JsonLexer
 
 from .colors import (
-  blue,
-  green,
-  grey,
-  red,
-  yellow,
+    blue,
+    green,
+    grey,
+    red,
+    yellow,
 )
+
 
 def human_filesize(value):
     for unit in ['', 'kb', 'mb', 'gb']:
@@ -25,24 +26,24 @@ def human_filesize(value):
 def _wrap(message, indent=0):
     lines = message.split('\n')
     return '\n'.join([
-      '\n'.join(textwrap.wrap(
-        lines[idx],
-        width=100,
-        initial_indent='' if idx == 0 else ' ' * indent,
-        subsequent_indent=' ' * indent,
-        break_on_hyphens=False,
-        break_long_words=False,
-      ))
-      for idx in range(len(lines))
+        '\n'.join(textwrap.wrap(
+            lines[idx],
+            width=100,
+            initial_indent='' if idx == 0 else ' ' * indent,
+            subsequent_indent=' ' * indent,
+            break_on_hyphens=False,
+            break_long_words=False,
+        ))
+        for idx in range(len(lines))
     ])
 
 
 def output_json(body):
     json_string = json.dumps(
-      body,
-      sort_keys=True,
-      indent=2,
-      ensure_ascii=False
+        body,
+        sort_keys=True,
+        indent=2,
+        ensure_ascii=False
     )
     print(highlight(json_string, JsonLexer(), TerminalFormatter()), end='')
 
@@ -65,7 +66,7 @@ def _write_coded(code, message, color=None, bold=False):
     prefix_length = len(prefix)
     if color:
         prefix = color(prefix, bold=bold)
-    write_message(prefix + ' ', message, prefix_length=prefix_length+1)
+    write_message(prefix + ' ', message, prefix_length=prefix_length + 1)
 
 
 def write_error(message, code='ERR!'):

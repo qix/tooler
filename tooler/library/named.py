@@ -7,6 +7,7 @@ tooler = Tooler()
 
 hostlist = []
 
+
 def _expand(name):
     'Expand x{a,b} => xa, xb;; x{1..3} => x1, x2, x3'
     match = re.match(r'^(.*?)\{(.*)\}(.*?)$', name)

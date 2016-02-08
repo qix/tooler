@@ -4,7 +4,9 @@ from collections import defaultdict
 
 from tooler.hosts import SshHost
 
+
 class SshConfig(object):
+
     def __init__(self):
         self.hosts = defaultdict(dict)
         for filename in ['/etc/ssh/config', '~/.ssh/config']:
@@ -24,16 +26,15 @@ class SshConfig(object):
         current_host = None
 
         for line in stream:
-              match = re.match(r'^([a-zA-Z]+)\w*([^#]+)\w*(?:#.*)?$', line)
-              if not match:
-                  continue
-              (key, value) = [group.strip() for group in match.groups()]
+            match = re.match(r'^([a-zA-Z]+)\w*([^#]+)\w*(?:#.*)?$', line)
+            if not match:
+                continue
+            (key, value) = [group.strip() for group in match.groups()]
 
-              if key.lower() == 'host':
-                  current_host = value
-              
-              self.hosts[current_host][key.lower()] = value
+            if key.lower() == 'host':
+                current_host = value
 
+            self.hosts[current_host][key.lower()] = value
 
     def get_hosts(self):
         return [

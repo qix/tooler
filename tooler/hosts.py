@@ -3,16 +3,18 @@ import sys
 from collections import namedtuple
 
 from .colors import (
-  grey,
+    grey,
 )
 
 SshHost = namedtuple('SshHost', (
-  'username',
-  'hostname',
-  'name',
+    'username',
+    'hostname',
+    'name',
 ))
 
+
 class Host(object):
+
     def print(self, message='', symbol=':', user=None, **kv):
         # @TODO: Ideally this could take multiline messages, and similar print()
         # arguments.
@@ -32,6 +34,7 @@ class Host(object):
 
 
 class SshHost(Host):
+
     def __init__(self, name, hostname=None, user=None, port=22, trust_host_key=None):
         self.name = name
         self.hostname = hostname if hostname is not None else name
@@ -39,7 +42,9 @@ class SshHost(Host):
         self.trust_host_key = trust_host_key
         self.port = port
 
+
 class LocalHost(Host):
+
     def __init__(self):
         self.name = 'local'
         self.hostname = 'localhost'

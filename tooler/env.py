@@ -1,30 +1,33 @@
 from contextlib import contextmanager
 
 from .hosts import (
-  Host,
-  SshHost,
-  LocalHost,
-  localhost,
+    Host,
+    SshHost,
+    LocalHost,
+    localhost,
 )
 from .shell import (
-  _local_bash,
-  _ssh_bash
+    _local_bash,
+    _ssh_bash
 )
 
 
 DEFAULTS = {
-  'directory': None,
-  'hosts': [localhost],
-  'tty': True,
-  'trust_host_key': False,
+    'directory': None,
+    'hosts': [localhost],
+    'tty': True,
+    'trust_host_key': False,
 }
+
 
 def _ensure_host(host):
     if isinstance(host, Host):
         return host
     return SshHost(host)
 
+
 class ToolerEnv(object):
+
     def __init__(self):
         self._stack = [DEFAULTS, {}]
 
@@ -44,8 +47,8 @@ class ToolerEnv(object):
 
     def add_hosts(self, hosts):
         self.set(
-          'hosts',
-          (self.hosts if self.hosts else []) + hosts
+            'hosts',
+            (self.hosts if self.hosts else []) + hosts
         )
 
     def set(self, prop, value):
@@ -63,5 +66,5 @@ class ToolerEnv(object):
         self._stack.pop()
 
         assert self._stack == original, (
-          'Expected original stack after call to settings'
+            'Expected original stack after call to settings'
         )

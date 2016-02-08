@@ -1,5 +1,6 @@
 from functools import partial
 
+
 def colored(code, text, bold=False, ansi=True):
     if not ansi:
         return text
