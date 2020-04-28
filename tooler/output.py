@@ -2,9 +2,6 @@ import json
 import textwrap
 import sys
 from datetime import datetime
-from pygments import highlight
-from pygments.formatters import TerminalFormatter
-from pygments.lexers import JsonLexer
 
 from .colors import (
     blue,

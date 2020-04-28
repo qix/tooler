@@ -47,7 +47,8 @@ class Tooler(object):
         self.env = parent.env
         self.root = parent.root
 
-    def command(self, fn=None, name=None, alias=[], default=False, parser=None):
+
+    def command(self, fn=None, /, *, name=None, alias=[], default=False, parser=None):
         # This function creates a decorator. If we were passed a function here then
         # we need to first create the decorator and then pass the function to
         # it.
@@ -197,10 +198,10 @@ class Tooler(object):
         self.usage(script_name)
         return False
 
-    def main(self, argv=None, **kv):
+    def main(self, argv=None, *, script_name=None, **kv):
         if argv is None:
             argv = sys.argv
-        script_name = argv[0]
+        script_name = script_name if script_name is not None else argv[0]
         args = argv[1:]
 
         with self.settings(**kv):

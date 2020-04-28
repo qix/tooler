@@ -1,7 +1,6 @@
 import argparse
 import inspect
 import re
-from docopt import docopt as _docopt
 from inspect import Parameter
 
 from .output import write_error

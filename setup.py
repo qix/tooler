@@ -26,11 +26,7 @@ setup(
     description=__doc__.split('\n')[0],
     long_description=readme,
     platforms='Any',
-    install_requires=[
-        'asyncssh >= 1.5.0',
-        'docopt >= 0.6.0',
-        'Pygments >= 2.1.0',
-    ],
+    install_requires=[],
     extras_require={},
     packages=find_packages(),
     entry_points={
