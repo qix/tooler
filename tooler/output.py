@@ -3,10 +3,10 @@ import textwrap
 import sys
 from datetime import datetime
 
-from .colors import (
+from .ansi import (
     blue,
     green,
-    grey,
+    white,
     red,
     yellow,
 )

@@ -1,9 +1,10 @@
 import asyncio
 import sys
+from contextlib import contextmanager
 from functools import wraps
 
 from .active import set_active_tooler
-from .colors import (
+from .ansi import (
     red,
     yellow,
 )
@@ -11,7 +12,6 @@ from .command import (
     CommandParseException,
     ToolerCommand,
 )
-from .env import ToolerEnv
 from .output import (
     output_json,
     write_error,
@@ -22,10 +22,10 @@ from .shell import (
 )
 
 
-class Tooler(object):
+class Tooler:
 
     def __init__(self):
-        self.env = ToolerEnv()
+        self.env = None
 
         self.aliases = {}
         self.commands = {}
@@ -44,7 +44,6 @@ class Tooler(object):
 
     def _set_parent(self, parent):
         self.parent = parent
-        self.env = parent.env
         self.root = parent.root
 
 
@@ -308,5 +307,6 @@ class Tooler(object):
     def bash(self, *args, **kv):
         return bash(self.env, *args, **kv)
 
+    @contextmanager
     def settings(self, *args, **kv):
-        return self.env.settings(*args, **kv)
+        yield

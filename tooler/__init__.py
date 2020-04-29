@@ -1,7 +1,6 @@
 from functools import wraps
 from shlex import quote as shell_quote
 
-import tooler.library
 from .active import (
     get_active_tooler,
     set_active_tooler,
@@ -10,11 +9,6 @@ from .command import (
     default_parser,
     raw_parser,
     docopt_parser,
-)
-from .env import (
-    LocalHost,
-    SshHost,
-    localhost,
 )
 from .output import (
     write_status,
@@ -76,15 +70,7 @@ def prompt(*a, **k):
     return _tooler().prompt(*a, **k)
 
 
-def settings(*a, **k):
-    return _tooler().settings(*a, **k)
-
 # Add some compatability helpers for fabric migrations
-
-
-def local(*a, **k):
-    return _tooler().bash(*a, hosts=[localhost], **k)[0]
-
 
 def sudo(*a, **k):
     return _tooler().bash(*a, user='root', **k)
@@ -92,15 +78,3 @@ def sudo(*a, **k):
 
 def cd(path):
     return settings(directory=path)
-
-
-def runs_once(fn):
-    results = {}
-
-    @wraps(fn)
-    def decorated(*a, **kv):
-        key = (tuple(a), tuple(kv.items()))
-        if key not in results:
-            results[key] = fn(*a, **kv)
-        return results[key]
-    return decorated
