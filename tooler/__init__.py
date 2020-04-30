@@ -3,7 +3,6 @@ from functools import wraps
 from .command import (
     default_parser,
     raw_parser,
-    docopt_parser,
 )
 from .tooler import Tooler
 from .version import (

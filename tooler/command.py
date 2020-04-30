@@ -14,7 +14,7 @@ class CommandParseException(Exception):
         super().__init__(message)
 
 
-def default_parser(fn, doc, selector, args):
+def default_parser(fn, args):
     signature = inspect.signature(fn)
     parser = argparse.ArgumentParser()
 
@@ -23,10 +23,16 @@ def default_parser(fn, doc, selector, args):
     positional = []
     keyword = {}
 
+    boolean = {
+        name for name, param in signature.parameters.items()
+        if param.default in (True, False)
+        or param.annotation == bool
+    }
+
     while idx < len(args):
         if not args[idx].startswith('-'):
             if len(keyword):
-                raise Exception(
+                raise CommandParseException(
                     'Positional arguments not valid after a keyword')
             positional.append(args[idx])
             idx += 1
@@ -35,18 +41,36 @@ def default_parser(fn, doc, selector, args):
             idx += 1
 
             if not match:
-                raise Exception('Could not identify argument: %s', args[idx])
-
+                raise CommandParseException('Could not identify argument: %s', args[idx])
+            
+            # Read the parameter out, automatic swap `-` for `_` in keyword arguments
             (key, value) = match.groups()
-            if key in keyword:
-                raise Exception('Value already set: ' + key)
+            key = key.replace('-', '_')
 
-            # "--arg <value>" style; read value out of next argument
-            if value is None:
-                if idx >= len(args):
-                    raise Exception('No value for argument: %s' % args[idx])
-                value = args[idx]
-                idx += 1
+            if key in boolean:
+                if value is not None:
+                    raise CommandParseException(f'Expected boolean value for parameter: {key}')
+                value = True
+            elif key.startswith('no_') and key[3:] in boolean:
+                if value is not None:
+                    raise CommandParseException(f'Expected boolean value for parameter: {key}')
+                key = key[3:]
+                value = False
+            elif ('no_' + key) in boolean:
+                if value is not None:
+                    raise CommandParseException(f'Expected boolean value for parameter: {key}')
+                key = 'no_' + key
+                value = False
+            else:
+                if key in keyword:
+                    raise CommandParseException('Value already set: ' + key)
+
+                # "--arg <value>" style; read value out of next argument
+                if value is None:
+                    if idx >= len(args):
+                        raise CommandParseException('No value for argument: %s' % key)
+                    value = args[idx]
+                    idx += 1
 
             keyword[key] = value
 
@@ -86,23 +110,17 @@ def default_parser(fn, doc, selector, args):
     return (tuple(args), kv)
 
 
-def docopt_parser(fn, doc, selector, args):
-    assert selector is None, 'selector not valid with docopt'
-    return ((_docopt(doc.strip(), argv=args),), {})
+def raw_parser(fn, args):
+    return (tuple(args), {})
 
 
-def raw_parser(fn, doc, selector, args):
-    return ((selector, tuple(args)), {})
+class ToolerCommand:
 
-
-class ToolerCommand(object):
-
-    def __init__(self, name, fn, doc=None, parser=None):
+    def __init__(self, name, fn, parser=None):
         self.name = name
         self.fn = fn
-        self.doc = doc
         self.parser = default_parser if parser is None else parser
 
     def run(self, selector, argv):
-        (args, vargs) = self.parser(self.fn, self.doc, selector, argv)
+        (args, vargs) = self.parser(self.fn, argv)
         return self.fn(*args, **vargs)

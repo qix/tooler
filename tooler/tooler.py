@@ -55,7 +55,7 @@ class Tooler:
 
             self.add_command(
                 fn.__name__ if name is None else name,
-                ToolerCommand(fn.__name__, fn, doc=fn.__doc__, parser=parser,),
+                ToolerCommand(fn.__name__, fn, parser=parser),
                 default=default,
             )
 
