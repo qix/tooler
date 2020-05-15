@@ -1,7 +1,9 @@
 import argparse
 import inspect
 import re
+import shlex
 from inspect import Parameter
+from typing import List
 
 from .output import write_error
 
@@ -9,9 +11,13 @@ ARG_REGEX = re.compile(r'^--([a-z]+(?:-[a-z]+)*)(?:=(.*))?$')
 
 
 class CommandParseException(Exception):
+    pass
 
-    def __init__(self, message):
+
+class UsageException(Exception):
+    def __init__(self, command: 'ToolerCommand', message):
         super().__init__(message)
+        self.command = command
 
 
 def default_parser(fn, args):
@@ -32,7 +38,7 @@ def default_parser(fn, args):
     while idx < len(args):
         if not args[idx].startswith('-'):
             if len(keyword):
-                raise CommandParseException(
+                raise CommandParseException( 
                     'Positional arguments not valid after a keyword')
             positional.append(args[idx])
             idx += 1
@@ -41,7 +47,7 @@ def default_parser(fn, args):
             idx += 1
 
             if not match:
-                raise CommandParseException('Could not identify argument: %s', args[idx])
+                raise CommandParseException( 'Could not identify argument: %s' % args[idx])
             
             # Read the parameter out, automatic swap `-` for `_` in keyword arguments
             (key, value) = match.groups()
@@ -49,26 +55,26 @@ def default_parser(fn, args):
 
             if key in boolean:
                 if value is not None:
-                    raise CommandParseException(f'Expected boolean value for parameter: {key}')
+                    raise CommandParseException( f'Expected boolean value for parameter: {key}')
                 value = True
             elif key.startswith('no_') and key[3:] in boolean:
                 if value is not None:
-                    raise CommandParseException(f'Expected boolean value for parameter: {key}')
+                    raise CommandParseException( f'Expected boolean value for parameter: {key}')
                 key = key[3:]
                 value = False
             elif ('no_' + key) in boolean:
                 if value is not None:
-                    raise CommandParseException(f'Expected boolean value for parameter: {key}')
+                    raise CommandParseException( f'Expected boolean value for parameter: {key}')
                 key = 'no_' + key
                 value = False
             else:
                 if key in keyword:
-                    raise CommandParseException('Value already set: ' + key)
+                    raise CommandParseException( 'Value already set: ' + key)
 
                 # "--arg <value>" style; read value out of next argument
                 if value is None:
                     if idx >= len(args):
-                        raise CommandParseException('No value for argument: %s' % key)
+                        raise CommandParseException( 'No value for argument: %s' % key)
                     value = args[idx]
                     idx += 1
 
@@ -90,7 +96,7 @@ def default_parser(fn, args):
             # **kv, take rest of keyword arguments
             for key, value in keyword.items():
                 if key in kv:
-                    raise Exception('Multiple values for key: ' + key)
+                    raise CommandParseException( 'Multiple values for key: ' + key)
                 kv[key] = value
             keyword = {}
         else:
@@ -99,7 +105,7 @@ def default_parser(fn, args):
             elif param.default != inspect._empty:
                 kv[key] = param.default
             else:
-                raise Exception('No default set for: ' + key)
+                raise CommandParseException( 'No default set for: ' + key)
 
     if positional or keyword:
         raise CommandParseException(
@@ -122,5 +128,38 @@ class ToolerCommand:
         self.parser = default_parser if parser is None else parser
 
     def run(self, selector, argv):
-        (args, vargs) = self.parser(self.fn, argv)
+        try:
+            (args, vargs) = self.parser(self.fn, argv)
+        except CommandParseException as e:
+            raise UsageException(self, str(e))
         return self.fn(*args, **vargs)
+
+    def usage(self, command: List[str]):
+        sig = inspect.signature(self.fn)
+        params = sig.parameters
+
+        lines = []
+        longest_param = max((len(k) for k in params.keys()), default=0)
+
+        for key, param in params.items():
+            options = []
+            if param.default == inspect._empty:
+                options.append("required")
+            elif isinstance(param.default, bool):
+                options.append("default %s" % str(param.default).lower())
+            elif param.default != "":
+                options.append("default %s" % repr(param.default))
+
+            key_dashed = key.replace('_', '-')
+            padding = " " * (longest_param - len(key) + 4)
+            description = ", ".join(options)
+            lines.append(f"  --{key_dashed}{padding}{description}")
+
+        full_command = ' '.join(shlex.quote(arg) for arg in command)
+
+        if not lines:
+            return full_command + '\n    No parameters available.\n'
+    
+        return (
+            full_command + '\n' +           '\n'.join(lines) + '\n'
+        )

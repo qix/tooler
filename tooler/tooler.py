@@ -5,16 +5,18 @@ from functools import wraps
 
 from .active import set_active_tooler
 from .ansi import (
+    abort,
+    error,
     red,
     yellow,
 )
 from .command import (
     CommandParseException,
     ToolerCommand,
+    UsageException,
 )
 from .output import (
     output_json,
-    write_error,
 )
 
 
@@ -155,8 +157,13 @@ class Tooler:
         if command in self.commands:
             try:
                 result = self.commands[command].run(selector, args)
+
+            except UsageException as e:
+                error(str(e))
+                print(e.command.usage([command]), file=sys.stderr)
+                return False
             except CommandParseException as e:
-                write_error(str(e))
+                error(str(e))
                 return False
 
             if result is not None and output is not None:
@@ -170,13 +177,13 @@ class Tooler:
         for length in range(1, 1 + len(splits)):
             submodule_name = ".".join(splits[:length])
             if submodule_name in self.failed_submodules:
-                write_error(
+                error(
                     "Failed to load submodule %s: %s"
                     % (submodule_name, self.failed_submodules[submodule_name])
                 )
                 return False
 
-        write_error("Invalid command: %s" % command)
+        error("Invalid command: %s" % command)
         self.usage(script_name)
         return False
 
@@ -209,11 +216,6 @@ class Tooler:
 
         print("")
         print("Use '%s<command> --help' for help on a single command" % prefix)
-
-    def abort(self, message):
-        write_error(message, code="ABORT")
-        self.loop.close()
-        sys.exit(1)
 
     def prompt(
         self,
@@ -255,35 +257,11 @@ class Tooler:
 
         except EOFError:
             sys.stdout.write("\n")
-            self.abort("Could not read prompt from stdin.")
+            abort("Could not read prompt from stdin.")
         except KeyboardInterrupt:
             sys.stdout.write("\n")
             sys.exit(1)
 
-    def proceed(self, message=None, default=True):
-        if message is None:
-            message = self.default_proceed_message
-
-        answers = {
-            "y": True,
-            "yes": True,
-            "n": False,
-            "no": False,
-        }
-
-        suggestion = " [y/n]"
-        result = self.prompt(
-            message,
-            options=answers.keys(),
-            default="y" if default else "n",
-            suggestion="Y/n" if default else "y/N",
-            lower=True,
-        )
-        return answers[result]
-
-    def proceed_or_abort(self, message=None, default=False):
-        if not self.proceed(message, default=default):
-            self.abort("User requested not to proceed.")
 
     @contextmanager
     def settings(self, *args, **kv):

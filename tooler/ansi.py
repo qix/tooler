@@ -5,7 +5,10 @@
 # See https://github.com/qix/clide/blob/master/LICENSE for details
 
 from functools import partial
+import sys
 from typing import List
+
+default_sentinel = object()
 
 code_black = 0
 code_red = 1
@@ -22,9 +25,10 @@ def ansi_sgr(sequence: List[int]):
     return "\033[%sm" % ";".join(map(str, sequence))
 
 
-def colored(
-    text,
-    *,
+reset = ansi_sgr([0])
+
+
+def color(
     foreground=None,
     background=None,
     bold=False,
@@ -35,11 +39,7 @@ def colored(
     bright_background=False,
     underline=False,
     overline=False,
-    ansi=True
 ):
-    if not ansi:
-        return text
-
     sequence = []
     if bold:
         sequence.append(1)
@@ -57,14 +57,64 @@ def colored(
         sequence.append(30 + foreground + (60 if bright else 0))
     if background is not None:
         sequence.append(40 + background + (60 if bright_background else 0))
-    return ansi_sgr(sequence) + text + ansi_sgr([0])
+    return ansi_sgr(sequence)
 
 
-black = partial(colored, foreground=code_black)
-red = partial(colored, foreground=code_red)
-green = partial(colored, foreground=code_green)
-yellow = partial(colored, foreground=code_yellow)
-blue = partial(colored, foreground=code_blue)
-magenta = partial(colored, foreground=code_magenta)
-cyan = partial(colored, foreground=code_cyan)
-white = partial(colored, foreground=code_white)
+def build_color(c):
+    def fn(
+        text=None, *, ansi=True, **kv,
+    ):
+        if text is None:
+            return color(foreground=c, **kv)
+        elif not ansi:
+            return text
+
+        return color(foreground=c, **kv) + text + reset
+
+    return fn
+
+
+black = build_color(code_black)
+red = build_color(code_red)
+green = build_color(code_green)
+yellow = build_color(code_yellow)
+blue = build_color(code_blue)
+magenta = build_color(code_magenta)
+cyan = build_color(code_cyan)
+white = build_color(code_white)
+
+
+def ansi_message(color_escape, code, message):
+    print(
+        white(dim=True)
+        + "["
+        + color_escape
+        + code
+        + white(dim=True)
+        + "]"
+        + reset
+        + " "
+        + message,
+        file=sys.stderr,
+    )
+
+
+def info(message: str):
+    ansi_message(white(bold=True), "INFO", message)
+
+
+def okay(message: str):
+    ansi_message(green(bold=True), "OKAY", message)
+
+
+def warn(message: str):
+    ansi_message(yellow(bold=True), "WARN", message)
+
+
+def error(message: str):
+    ansi_message(red(bold=True), "ERR!", message)
+
+
+def abort(message: str):
+    ansi_message(red(bold=True), "ABORT", message)
+    sys.exit(1)
