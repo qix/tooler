@@ -15,9 +15,7 @@ from .command import (
     ToolerCommand,
     UsageException,
 )
-from .output import (
-    output_json,
-)
+from .output import output_json
 
 
 class Tooler:
@@ -32,16 +30,10 @@ class Tooler:
         self.default_proceed_message = "Are you sure you want to proceed?"
         self.assume_defaults = False
         self.default = None
-        self.root = self
-        self.parent = None
 
         self.loop = asyncio.get_event_loop()
 
         self.namespace = set()
-
-    def _set_parent(self, parent):
-        self.parent = parent
-        self.root = parent.root
 
     def command(self, fn=None, /, *, name=None, alias=[], default=False, parser=None):
         # This function creates a decorator. If we were passed a function here then
@@ -55,7 +47,7 @@ class Tooler:
             def decorated(*args, **kv):
                 return fn(*args, **kv)
 
-            self.add_command(
+            self._add_command(
                 fn.__name__ if name is None else name,
                 ToolerCommand(fn.__name__, fn, parser=parser),
                 default=default,
@@ -65,7 +57,7 @@ class Tooler:
 
         return decorator
 
-    def add_command(self, name, command, default=False):
+    def _add_command(self, name, command, default=False):
         if name in self.namespace:
             raise Exception("Second definition of %s" % name)
         self.namespace.add(name)
@@ -76,19 +68,10 @@ class Tooler:
 
         self.commands[name] = command
 
-    def add_submodule(self, name, tooler):
-        if name in self.namespace:
-            raise Exception("Second definition of %s" % name)
+    def subcommand(self, name, tooler):
+        assert isinstance(tooler, Tooler)
 
-        if tooler.has_default():
-            self.add_command(name, tooler.default)
-        else:
-            self.namespace.add(name)
-
-        for subname, command in tooler.commands.items():
-            self.add_command("%s.%s" % (name, subname), command)
-
-        tooler._set_parent(self)
+        self._add_command(name, tooler)
 
     def add_failed_submodule(self, name, reason):
         if name in self.namespace:
@@ -106,14 +89,16 @@ class Tooler:
     def has_default(self):
         return True if self.default else False
 
-    def run(self, args=None, script_name=None, output=output_json):
+    def run(self, argv=None, script_name=None, output=output_json):
         set_active_tooler(self)
 
-        if args is None:
-            args = sys.argv[:]
-            script_name = args.pop(0)
+        if argv is None:
+            argv = sys.argv[:]
+            argv_script = argv.pop(0)
+            if not script_name:
+                script_name = argv_script
 
-        if type(args) in (bytes, str):
+        if type(argv) in (bytes, str):
             raise Exception("Tooler args cannot be bytes/string, use an array")
 
         # Super simple parser for tooler options
@@ -123,25 +108,21 @@ class Tooler:
 
         idx = 0
         command = None
-        while idx < len(args):
-            if args[idx] in toggles:
+        while idx < len(argv):
+            if argv[idx] in toggles:
                 # If it's a toggle switch to true if it was used once
-                if toggles[args[idx]]:
-                    print("Error argument", args[idx])
+                if toggles[argv[idx]]:
+                    print("Error argument", argv[idx])
                     return
                 else:
-                    toggles[args[idx]] = True
+                    toggles[argv[idx]] = True
                 idx += 1
-            elif args[idx].startswith("-"):
-                print("Error argument", args[idx])
+            elif argv[idx].startswith("-"):
+                print("Error argument", argv[idx])
                 return
             else:
-                command = args[idx]
-                if ":" in command:
-                    (command, selector) = command.split(":", 1)
-                else:
-                    selector = None
-                args = args[idx + 1 :]
+                command = argv[idx]
+                argv = argv[idx + 1 :]
                 break
 
         self.assume_defaults = toggles["--assume-defaults"]
@@ -156,7 +137,7 @@ class Tooler:
 
         if command in self.commands:
             try:
-                result = self.commands[command].run(selector, args)
+                result = self.commands[command].run(argv)
 
             except UsageException as e:
                 error(str(e))
@@ -261,7 +242,6 @@ class Tooler:
         except KeyboardInterrupt:
             sys.stdout.write("\n")
             sys.exit(1)
-
 
     @contextmanager
     def settings(self, *args, **kv):
