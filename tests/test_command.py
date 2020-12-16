@@ -1,15 +1,29 @@
 import shlex
 from functools import partial
 
-from tooler.command import (
-    default_parser,
-    raw_parser,
-)
+from tooler import DefaultParser, RawParser
 
-def parse(fn, command, parser=default_parser):
-    return parser(fn, shlex.split(command))
+def parse(fn, command, parser=None, parser_factory=DefaultParser):
+    if parser is None:
+        parser = parser_factory()
+    return parser.parse(fn, 'sample command', None, shlex.split(command))
 
-def check(fn, command, *args, parser=default_parser, **kv):
+def check(
+    fn, 
+    command,
+    *args,
+    parser=DefaultParser(),
+    throws=None,
+    **kv
+):
+    if throws:
+        assert not args and not kv
+        try:
+            parse(fn, command, parser=parser)
+        except Exception as e:
+            assert str(e) == throws
+        raise Exception('Expected function to throw an exception')
+
     assert parse(fn, command, parser=parser) == (args, kv)
 
 
@@ -37,10 +51,7 @@ class TestDefaultParser:
             'one',
             'one'
         )
-        _assert(
-            'one',
-            'one'
-        )
+
 
     def test_boolean(self):
 
@@ -55,7 +66,7 @@ class TestDefaultParser:
         assert parse(simple, '--no-good') == ((), dict(good=False))
 
         assert parse(negated, '') == ((), dict(no_good=True))
-        assert parse(negated, '--good') == ((), dict(no_good=False))
+        #assert parse(negated, '--good') == ((), dict(no_good=False))
         assert parse(negated, '--no-good') == ((), dict(no_good=True))
 
 class TestRawParser:
@@ -65,4 +76,4 @@ class TestRawParser:
             pass
 
 
-        assert parse(fn, 'first --second third', parser=raw_parser) == (('first', '--second', 'third'), {})
+        assert parse(fn, 'first --second third', parser=RawParser()) == ([['first', '--second', 'third']], {})

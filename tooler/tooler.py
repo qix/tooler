@@ -1,248 +1,281 @@
 import asyncio
+from dataclasses import dataclass
+import functools
+import os
 import sys
-from contextlib import contextmanager
-from functools import wraps
+from typing import Any, Dict, List, Optional, Union
 
-from .active import set_active_tooler
-from .ansi import (
-    abort,
-    error,
-    red,
-    yellow,
-)
-from .command import (
-    CommandParseException,
-    ToolerCommand,
-    UsageException,
-)
-from .output import output_json
+from .clide.english import and_join
+from .command import Command, DecoratorCommand
+from .exceptions import CommandParseException
+from .output import output_default
+from .parser import ARG_REGEX
+
+
+@dataclass
+class ToolerOptionConfig:
+  description: str
+  default: Any
+
+
+class UsageCommand(Command):
+  def __init__(self, tooler):
+    self.tooler = tooler
+
+  def run(self, selector, argv):
+    self.tooler.usage()
+
+
+def _is_similar(command, search_command):
+  return search_command in command
 
 
 class Tooler:
-    def __init__(self):
-        self.env = None
+  def __init__(self, help: Optional[str] = None):
+    self.root = self
+    self.parent = None
 
-        self.aliases = {}
-        self.commands = {}
-        self.submodules = {}
-        self.failed_submodules = {}
+    self.default_command = None
+    self.commands = {}
+    self.namespace = set()
 
-        self.default_proceed_message = "Are you sure you want to proceed?"
-        self.assume_defaults = False
-        self.default = None
+    self.help = help
+    self.options = {}
+    self.arguments = {}
 
-        self.loop = asyncio.get_event_loop()
+    self.add_argument(
+        "assume-defaults",
+        description="Assume the default answer for proceed questions",
+        default=False,
+    )
+    self.add_argument(
+        "help", description="Display usage information for the tool", default=False
+    )
 
-        self.namespace = set()
+  def _set_parent(self, parent):
+    self.parent = parent
+    self.root = parent.root
 
-    def command(self, fn=None, /, *, name=None, alias=[], default=False, parser=None):
-        # This function creates a decorator. If we were passed a function here then
-        # we need to first create the decorator and then pass the function to
-        # it.
-        if fn is not None:
-            return self.command()(fn)
+  def add_argument(self, arg, description=None, default=None):
+    self.root.arguments[arg] = ToolerOptionConfig(description=description, default=default)
+    if arg not in self.root.options:
+      self.root.options[arg] = default
 
-        def decorator(fn):
-            @wraps(fn)
-            def decorated(*args, **kv):
-                return fn(*args, **kv)
+  def command(
+      self,
+      fn=None,
+      *,
+      name=None,
+      default: bool = False,
+      shorthands: Optional[Dict[str, str]] = None,
+      parser=None,
+  ):
+    # This function creates a decorator. If we were passed a function here then
+    # we need to first create the decorator and then pass the function to
+    # it.
+    if fn is not None:
+      return self.command(
+          name=name,
+          default=default,
+          shorthands=shorthands,
+          parser=parser,
+      )(fn)
 
-            self._add_command(
-                fn.__name__ if name is None else name,
-                ToolerCommand(fn.__name__, fn, parser=parser),
-                default=default,
+    def decorator(fn):
+      @functools.wraps(fn)
+      def decorated(*args, **kv):
+        return fn(*args, **kv)
+
+      self.add_command(
+          fn.__name__.replace("_", "-") if name is None else name,
+          DecoratorCommand(fn, doc=fn.__doc__, parser=parser, shorthands=shorthands),
+          default=default,
+      )
+
+      return decorated
+
+    return decorator
+
+  def conflicts(self, *groups: List[Union[str, List[str]]]):
+    """
+Refuse to run the command if conflicting parameters are provided.
+"""
+
+    def decorator(fn):
+      @functools.wraps(fn)
+      def decorated(*args, **kv):
+        seen = []
+        for group in groups:
+          if isinstance(group, str):
+            group = [group]
+          for entry in group:
+            if kv.get(entry):
+              seen.append(entry)
+              break
+
+        if len(seen) > 1:
+          raise CommandParseException(
+              "Arguments are conflicting %s"
+              % and_join(['"--%s"' % arg.replace("_", "-") for arg in seen])
+          )
+
+        return fn(*args, **kv)
+
+      return decorated
+
+    return decorator
+
+  def add_command(self, name, command, default=False):
+    if name in self.namespace:
+      raise Exception("Second definition of %s" % name)
+    self.namespace.add(name)
+
+    if default:
+      assert self.default_command is None, "Only one default option is allowed."
+      self.default_command = command
+
+    self.commands[name] = command
+
+  def has_default(self):
+    return True if self.default_command else False
+
+  def parse_command(self, args=None, script_name=None):
+    if args is None:
+      args = sys.argv[:]
+      script_name = args.pop(0)
+
+    if type(args) in (bytes, str):
+      raise Exception("Tooler args cannot be bytes/string, use an array")
+
+    options = {}
+    idx = 0
+    command = None
+    selector = None
+    while idx < len(args):
+      # If we have a default command set, and this command doesn't exist
+      # We don't use it as a command and rather keep it as the first argument
+      # This is done before parsing `--<x>` style arguments so they are passed
+      # on to the default command as well.
+      if self.default_command:
+        if args[idx] not in self.commands:
+          break
+
+      arg_match = ARG_REGEX.match(args[idx])
+      if arg_match:
+        (arg_name, value) = arg_match.groups()
+        if arg_name not in self.root.arguments:
+          raise CommandParseException('Unknown tooler argument "%s"' % arg_name)
+        idx += 1
+
+        arg_config = self.root.arguments[arg_name]
+        if isinstance(arg_config.default, bool):
+          if value is not None:
+            raise CommandParseException(
+                'Value is not valid for bool arg "%s"' % arg_name
             )
-
-            return decorated
-
-        return decorator
-
-    def _add_command(self, name, command, default=False):
-        if name in self.namespace:
-            raise Exception("Second definition of %s" % name)
-        self.namespace.add(name)
-
-        if default:
-            assert self.default is None, "Only one default option is allowed."
-            self.default = command
-
-        self.commands[name] = command
-
-    def subcommand(self, name, tooler):
-        assert isinstance(tooler, Tooler)
-
-        self._add_command(name, tooler)
-
-    def add_failed_submodule(self, name, reason):
-        if name in self.namespace:
-            raise Exception("Second definition of %s" % name)
-        self.namespace.add(name)
-
-        self.failed_submodules[name] = reason
-
-    def alias(self, command, alias):
-        if alias in self.namespace:
-            raise Exception("Second definition of %s" % alias)
-        self.namespace.add(alias)
-        self.aliases[alias] = command
-
-    def has_default(self):
-        return True if self.default else False
-
-    def run(self, argv=None, script_name=None, output=output_json):
-        set_active_tooler(self)
-
-        if argv is None:
-            argv = sys.argv[:]
-            argv_script = argv.pop(0)
-            if not script_name:
-                script_name = argv_script
-
-        if type(argv) in (bytes, str):
-            raise Exception("Tooler args cannot be bytes/string, use an array")
-
-        # Super simple parser for tooler options
-        toggles = {
-            "--assume-defaults": False,
-        }
-
-        idx = 0
-        command = None
-        while idx < len(argv):
-            if argv[idx] in toggles:
-                # If it's a toggle switch to true if it was used once
-                if toggles[argv[idx]]:
-                    print("Error argument", argv[idx])
-                    return
-                else:
-                    toggles[argv[idx]] = True
-                idx += 1
-            elif argv[idx].startswith("-"):
-                print("Error argument", argv[idx])
-                return
-            else:
-                command = argv[idx]
-                argv = argv[idx + 1 :]
-                break
-
-        self.assume_defaults = toggles["--assume-defaults"]
-
-        # Follow aliases but throw on infinite loop
-        seen = set()
-        while command in self.aliases:
-            if command in seen:
-                raise Exception("Infinite loop in aliases: %s" % (", ".join(seen)))
-            seen.add(command)
-            command = self.aliases[command]
-
-        if command in self.commands:
-            try:
-                result = self.commands[command].run(argv)
-
-            except UsageException as e:
-                error(str(e))
-                print(e.command.usage([command]), file=sys.stderr)
-                return False
-            except CommandParseException as e:
-                error(str(e))
-                return False
-
-            if result is not None and output is not None:
-                output(result)
-            return result
-        elif command is None:
-            self.usage(script_name)
+          options[arg_name] = True
+        elif value is not None:
+          options[arg_name] = value
+        else:
+          if idx >= len(args):
+            raise CommandParseException(
+                'No value provided for argument "%s"' % arg_name
+            )
             return False
+          options[arg_name] = args[idx]
+          idx += 1
+      else:
+        # If we have a default command set, and this command doesn't exist
+        # We don't use it as a command and rather keep it as the first argument
+        if self.default_command:
+          if args[idx] not in self.commands:
+            break
 
-        splits = command.split(".")
-        for length in range(1, 1 + len(splits)):
-            submodule_name = ".".join(splits[:length])
-            if submodule_name in self.failed_submodules:
-                error(
-                    "Failed to load submodule %s: %s"
-                    % (submodule_name, self.failed_submodules[submodule_name])
-                )
-                return False
+        command = args[idx]
+        if ":" in command:
+          (command, selector) = command.split(":", 1)
+        args = args[idx + 1:]
+        break
 
-        error("Invalid command: %s" % command)
-        self.usage(script_name)
-        return False
+    # If no command was in the command line, use our default
+    if command is None and self.default_command:
+      command = self.default_command
 
-    def main(self, argv=None, *, script_name=None, **kv):
-        if argv is None:
-            argv = sys.argv
-        script_name = script_name if script_name is not None else argv[0]
-        args = argv[1:]
+    # Default to help, or overwrite if --help is set
+    if command is None or "help" in options:
+      command = UsageCommand(self)
 
-        with self.settings(**kv):
-            result = self.run(args, script_name=script_name)
-        self.loop.close()
-        sys.exit(1 if result is False else 0)
+    if isinstance(command, Command):
+      return (options, command, selector, args)
 
-    def usage(self, script_name="./script"):
-        prefix = script_name + " " if script_name else ""
+    if command in self.commands:
+      return (options, self.commands[command], selector, args)
 
-        print("Usage: %s<command> [options...]" % prefix)
-        print("")
-        print("Available commands:")
+    raise CommandParseException(
+        "Invalid command: %s" % command,
+        usage=self.usage(script_name, search_command=command, output=False),
+    )
 
-        available_commands = list(self.commands.keys()) + list(
-            self.failed_submodules.keys()
-        )
-        for command in sorted(available_commands):
-            print(
-                "  %s"
-                % (red(command) if command in self.failed_submodules else command)
-            )
+  def run(self, args=None, script_name=None, output=output_default):
+    try:
+      (options, command, selector, args) = self.parse_command(args, script_name)
+      self.root.options.update(options)
+      result = command.run(selector, args)
+    except CommandParseException as e:
+      e.print_help()
+      return False
 
-        print("")
-        print("Use '%s<command> --help' for help on a single command" % prefix)
+    if asyncio.iscoroutine(result):
+      loop = asyncio.get_event_loop()
+      result = loop.run_until_complete(result)
 
-    def prompt(
-        self,
-        message,
-        options=None,
-        default=None,
-        strip=True,
-        lower=False,
-        suggestion=None,
-    ):
-        # Sanity check
-        if options is not None:
-            assert (
-                default is None or default in options
-            ), "The default value must be an option"
+    if result is not None and output is not None:
+      output(result)
+    return result
 
-        if default is not None and self.assume_defaults:
-            print(message)
-            print(yellow("Assuming default option:"), yellow(default, bold=True))
-            return default
+  def main(self, argv=None):
+    if argv is None:
+      argv = sys.argv
+    script_name = argv[0]
+    args = argv[1:]
 
-        if default is not None and suggestion is None:
-            suggestion = default
-        if default:
-            message += " [%s]" % suggestion
+    if args == ["--bash-completion"]:
+      words = os.environ["COMP_WORDS"].split("\n")
+      word = int(os.environ["COMP_CWORD"])
+      if word == 1 and len(words) >= 1:
+        for command in self.commands.keys():
+          if command.startswith(words[1]):
+            print(command)
+      sys.exit(0)
 
-        try:
-            # Loop if the answer is not one of the listed options
-            while True:
-                result = input(message + " ")
-                result = result.strip() if strip else result
-                result = result.lower() if lower else result
-                if result == "" and default is not None:
-                    return default
-                elif options is None or result in options:
-                    return result
-                else:
-                    print(red("Could not interpret answer: "), repr(result))
+    rv = self.run(args, script_name=script_name)
+    sys.exit(0 if rv in (True, None) else 1)
 
-        except EOFError:
-            sys.stdout.write("\n")
-            abort("Could not read prompt from stdin.")
-        except KeyboardInterrupt:
-            sys.stdout.write("\n")
-            sys.exit(1)
+  def usage(self, script_name="t", search_command=None, output=True):
+    prefix = script_name + " " if script_name else ""
 
-    @contextmanager
-    def settings(self, *args, **kv):
-        yield
+    usage = "Usage: %s<command> [options...]\n\n" % prefix
+
+    list_commands = list(self.commands.keys())
+
+    if search_command is None:
+      usage += "Available commands:\n" if list_commands else "No commands available.\n"
+    else:
+      list_commands = [cmd for cmd in list_commands if _is_similar(cmd, search_command)]
+      usage += "Similar commands:\n" if list_commands else "No similar commands.\n"
+
+    if list_commands:
+      for command in sorted(list_commands):
+        usage += "  %s\n" % command
+
+    usage += "\n"
+
+    if search_command is not None:
+      usage += "Use '%s--help' to see the full list of all commands.\n" % prefix
+    usage += "Use '%s<command> --help' for help on a single command.\n" % prefix
+
+    if self.help:
+      usage += "\n" + self.help + "\n"
+    if output:
+      sys.stderr.write(usage)
+    return usage

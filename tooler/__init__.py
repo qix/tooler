@@ -1,9 +1,4 @@
-from functools import wraps
-
-from .command import (
-    default_parser,
-    raw_parser,
-)
+from .parser import DefaultParser, RawParser
 from .tooler import Tooler
 from .version import (
     __author__,
@@ -11,7 +6,3 @@ from .version import (
     __url__,
     __version__,
 )
-
-
-def cd(path):
-    return settings(directory=path)
