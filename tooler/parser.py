@@ -53,10 +53,10 @@ def _match_annotation_type(fn, annotation, value):
 
 def _match_param_type(fn, param, value):
     # If they've set a default do some automatic type conversion
-    if isinstance(param.default, int) or param.annotation == int:
-        return int(value)
-    elif isinstance(param.default, float) or param.annotation == float:
+    if isinstance(param.default, float) or param.annotation == float:
         return float(value)
+    elif isinstance(param.default, int) or param.annotation == int:
+        return int(value)
     elif param.annotation:
         return _match_annotation_type(fn, param.annotation, value)
     else:
