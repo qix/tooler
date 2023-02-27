@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tooler"
+dynamic = ["version"]
+description = "Tooler: Create friendly devops tools in minutes"
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "Josh Yudaken", email = "j@yud.co.za" },
+]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: 3",
+    "Topic :: Internet",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Networking",
+]
+dependencies = []
+
+[project.optional-dependencies]
+
+[project.scripts]
+tooler-ssh = "tooler.main:ssh"
+
+[project.urls]
+Homepage = "http://qix.github.io/tooler"
+
+[tool.hatch.version]
+path = "tooler/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/tooler",
+]
+

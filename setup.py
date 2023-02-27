@@ -9,7 +9,7 @@ from os import path
 from setuptools import (setup, find_packages)
 
 base = path.abspath(path.dirname(__file__))
-with open(path.join(base, 'README.rst')) as f:
+with open(path.join(base, 'README.md')) as f:
     readme = f.read()
 
 with open(path.join(base, 'tooler', 'version.py')) as version:
