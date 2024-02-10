@@ -33,7 +33,7 @@ tooler-ssh = "tooler.main:ssh"
 Homepage = "http://qix.github.io/tooler"
 
 [tool.hatch.version]
-path = "tooler/__init__.py"
+path = "tooler/version.py"
 
 [tool.hatch.build.targets.sdist]
 include = [
