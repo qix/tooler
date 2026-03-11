@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from .clide.english import and_join
 from .command import Command, DecoratorCommand
-from .exceptions import CommandParseException
+from .exceptions import CommandParseException, ExceptionWithHelp
 from .output import output_default
 from .parser import ARG_REGEX
 
@@ -221,7 +221,7 @@ Refuse to run the command if conflicting parameters are provided.
       (options, command, selector, args) = self.parse_command(args, script_name)
       self.root.options.update(options)
       result = command.run(selector, args)
-    except CommandParseException as e:
+    except ExceptionWithHelp as e:
       e.print_help()
       return False
 
