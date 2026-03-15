@@ -1,10 +1,6 @@
-Tooler: Python-based command line tools
-=======================================
+# Tooler: Python-based command line tools
 
+## Thanks required:
 
-
-Thanks required:
-----------------
-
-* [fabric](https://github.com/fabric/fabric) & [baker](https://bitbucket.org/mchaput/baker) as inspiration
-* [pyinvoke](https://www.pyinvoke.org/) is a similar approach
+- [fabric](https://github.com/fabric/fabric) & [baker](https://bitbucket.org/mchaput/baker) as inspiration
+- [pyinvoke](https://www.pyinvoke.org/) is a similar approach
